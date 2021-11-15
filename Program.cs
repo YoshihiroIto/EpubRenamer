@@ -12,14 +12,12 @@ if (args.Length == 0)
 var targetDir = args[0];
 var filepaths = Directory.EnumerateFiles(targetDir, "*.epub", SearchOption.AllDirectories);
 
-var invalidChars = new HashSet<char>(Path.GetInvalidFileNameChars());
-
 foreach (var filepath in filepaths)
-    Rename(filepath, invalidChars);
+    Rename(filepath);
 
 return 0;
 
-bool Rename(string filepath, HashSet<char> invalidChars)
+static bool Rename(string filepath)
 {
     filepath = Path.GetFullPath(filepath);
 
@@ -68,7 +66,7 @@ bool Rename(string filepath, HashSet<char> invalidChars)
     if (string.IsNullOrEmpty(title))
         return false;
 
-    title = string.Concat(title.Select(c => invalidChars.Contains(c) ? '_' : c));
+    title = string.Concat(title.Select(c => Local.InvalidChars.Contains(c) ? '_' : c));
 
     var dir = Path.GetDirectoryName(filepath);
     if (string.IsNullOrEmpty(dir))
@@ -80,4 +78,9 @@ bool Rename(string filepath, HashSet<char> invalidChars)
         File.Move(filepath, newFilepath);
 
     return true;
+}
+
+internal static class Local
+{
+    static public readonly HashSet<char> InvalidChars = new(Path.GetInvalidFileNameChars());
 }
