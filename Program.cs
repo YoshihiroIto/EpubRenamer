@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using System.Xml.Linq;
 using System.Xml.XPath;
 
