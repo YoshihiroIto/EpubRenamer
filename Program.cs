@@ -25,39 +25,37 @@ bool Rename(string filepath)
 
     var title = "";
     {
-        using (var zipToOpen = new FileStream(filepath, FileMode.Open))
+        using (var zip = new FileStream(filepath, FileMode.Open))
+        using (var archive = new ZipArchive(zip, ZipArchiveMode.Read))
         {
-            using (var archive = new ZipArchive(zipToOpen, ZipArchiveMode.Read))
+            var contentOpfPath = "";
+
+            var containerXmlEntry = archive.GetEntry("META-INF/container.xml");
+            if (containerXmlEntry == null)
+                return false;
+
+            using (var reader = new StreamReader(containerXmlEntry.Open()))
             {
-                var contentOpfPath = "";
+                var doc = XDocument.Load(reader);
+                removeNamespace(doc);
 
-                var containerXmlEntry = archive.GetEntry("META-INF/container.xml");
-                if (containerXmlEntry == null)
-                    return false;
+                var rootfile = doc.XPathSelectElement("container/rootfiles/rootfile");
+                contentOpfPath = rootfile?.Attribute("full-path")?.Value;
+            }
 
-                using (var reader = new StreamReader(containerXmlEntry.Open()))
-                {
-                    var doc = XDocument.Load(reader);
-                    removeNamespace(doc);
+            if (contentOpfPath == null)
+                return false;
 
-                    var rootfile = doc.XPathSelectElement("container/rootfiles/rootfile");
-                    contentOpfPath = rootfile?.Attribute("full-path")?.Value;
-                }
+            var contentOpfXmlEntry = archive.GetEntry(contentOpfPath);
+            if (contentOpfXmlEntry == null)
+                return false;
 
-                if (contentOpfPath == null)
-                    return false;
+            using (var reader = new StreamReader(contentOpfXmlEntry.Open()))
+            {
+                var doc = XDocument.Load(reader);
+                removeNamespace(doc);
 
-                var contentOpfXmlEntry = archive.GetEntry(contentOpfPath);
-                if (contentOpfXmlEntry == null)
-                    return false;
-
-                using (var reader = new StreamReader(contentOpfXmlEntry.Open()))
-                {
-                    var doc = XDocument.Load(reader);
-                    removeNamespace(doc);
-
-                    title = doc.XPathSelectElement("package/metadata/title")?.Value;
-                }
+                title = doc.XPathSelectElement("package/metadata/title")?.Value;
             }
         }
     }
