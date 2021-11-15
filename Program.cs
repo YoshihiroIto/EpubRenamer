@@ -1,4 +1,5 @@
-﻿using System.IO.Compression;
+﻿using System.Collections.Generic;
+using System.IO.Compression;
 using System.Xml.Linq;
 using System.Xml.XPath;
 
@@ -6,18 +7,24 @@ if (args.Length == 0)
 {
     Console.WriteLine("Usage:");
     Console.WriteLine("    >EpubRenamer TargetDirName");
-    return;
+    return 1;
 }
 
 var targetDir = args[0];
 var filepaths = Directory.EnumerateFiles(targetDir, "*.epub", SearchOption.AllDirectories);
 
-foreach (var filepath in filepaths)
-    Rename(filepath);
+var invalidChars = new HashSet<char>(Path.GetInvalidFileNameChars());
 
-bool Rename(string filepath)
+foreach (var filepath in filepaths)
+    Rename(filepath, invalidChars);
+
+return 0;
+
+bool Rename(string filepath, HashSet<char> invalidChars)
 {
-    var removeNamespace = (XDocument doc) =>
+    filepath = Path.GetFullPath(filepath);
+
+    var removeNamespace = static (XDocument doc) =>
     {
         foreach (var e in doc.Descendants())
             e.Name = e.Name.LocalName;
@@ -25,45 +32,43 @@ bool Rename(string filepath)
 
     var title = "";
     {
-        using (var zip = new FileStream(filepath, FileMode.Open))
-        using (var archive = new ZipArchive(zip, ZipArchiveMode.Read))
+        using var zip = new FileStream(filepath, FileMode.Open);
+        using var archive = new ZipArchive(zip, ZipArchiveMode.Read);
+
+        var contentOpfPath = "";
+
+        var containerXmlEntry = archive.GetEntry("META-INF/container.xml");
+        if (containerXmlEntry == null)
+            return false;
+
+        using (var reader = new StreamReader(containerXmlEntry.Open()))
         {
-            var contentOpfPath = "";
+            var doc = XDocument.Load(reader);
+            removeNamespace(doc);
 
-            var containerXmlEntry = archive.GetEntry("META-INF/container.xml");
-            if (containerXmlEntry == null)
-                return false;
+            var rootfile = doc.XPathSelectElement("container/rootfiles/rootfile");
+            contentOpfPath = rootfile?.Attribute("full-path")?.Value;
+        }
 
-            using (var reader = new StreamReader(containerXmlEntry.Open()))
-            {
-                var doc = XDocument.Load(reader);
-                removeNamespace(doc);
+        if (contentOpfPath == null)
+            return false;
 
-                var rootfile = doc.XPathSelectElement("container/rootfiles/rootfile");
-                contentOpfPath = rootfile?.Attribute("full-path")?.Value;
-            }
+        var contentOpfXmlEntry = archive.GetEntry(contentOpfPath);
+        if (contentOpfXmlEntry == null)
+            return false;
 
-            if (contentOpfPath == null)
-                return false;
+        using (var reader = new StreamReader(contentOpfXmlEntry.Open()))
+        {
+            var doc = XDocument.Load(reader);
+            removeNamespace(doc);
 
-            var contentOpfXmlEntry = archive.GetEntry(contentOpfPath);
-            if (contentOpfXmlEntry == null)
-                return false;
-
-            using (var reader = new StreamReader(contentOpfXmlEntry.Open()))
-            {
-                var doc = XDocument.Load(reader);
-                removeNamespace(doc);
-
-                title = doc.XPathSelectElement("package/metadata/title")?.Value;
-            }
+            title = doc.XPathSelectElement("package/metadata/title")?.Value;
         }
     }
 
     if (string.IsNullOrEmpty(title))
         return false;
 
-    var invalidChars = Path.GetInvalidFileNameChars();
     title = string.Concat(title.Select(c => invalidChars.Contains(c) ? '_' : c));
 
     var dir = Path.GetDirectoryName(filepath);
@@ -71,7 +76,9 @@ bool Rename(string filepath)
         return false;
 
     var newFilepath = Path.Combine(dir, title + ".epub");
-    File.Move(filepath, newFilepath);
+
+    if (filepath != newFilepath)
+        File.Move(filepath, newFilepath);
 
     return true;
 }
