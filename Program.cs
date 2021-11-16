@@ -12,8 +12,7 @@ if (args.Length == 0)
 var targetDir = args[0];
 var filepaths = Directory.EnumerateFiles(targetDir, "*.epub", SearchOption.AllDirectories);
 
-foreach (var filepath in filepaths)
-    Rename(filepath);
+Parallel.ForEach(filepaths, filepath => Rename(filepath));
 
 return 0;
 
