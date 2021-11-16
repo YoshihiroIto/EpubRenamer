@@ -22,8 +22,15 @@
 				"${workspaceFolder}/EpubRenamer.csproj",
 				"/property:GenerateFullPaths=true",
 				"/consoleloggerparameters:NoSummary",
-			    "-c",
-                "Release"	
+			    "--configuration",
+                "Release",
+				"--runtime",
+				"win-x64",
+				"--self-contained",
+				"-p:PublishSingleFile=true",
+				"-p:PublishReadyToRun=true",
+				"-p:PublishTrimmed=true",
+				"-p:EnableCompressionInSingleFile=true"
 			],
 			"problemMatcher": "$msCompile"
 		},
